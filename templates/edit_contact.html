@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Edit Contact</title>
+  </head>
+
+  <body>
+    <h1>Edit Contact</h1>
+
+    <nav>
+      <a href="/">Dashboard</a> | <a href="/companies">Companies</a> |
+      <a href="/jobs">Jobs</a> | <a href="/applications">Applications</a> |
+      <a href="/contacts">Contacts</a>
+    </nav>
+
+    <hr />
+
+    <form
+      action="{{ url_for('edit_contact', contact_id=contact.contact_id) }}"
+      method="POST"
+    >
+      <label>Company:</label>
+      <select name="company_id" required>
+        {% for company in companies %}
+        <option
+          value="{{ company.company_id }}"
+          {%
+          if
+          company.company_id=""
+          ="contact.company_id"
+          %}
+          selected
+          {%
+          endif
+          %}
+        >
+          {{ company.company_name }}
+        </option>
+        {% endfor %}
+      </select>
+
+      <br /><br />
+
+      <label>Contact Name:</label>
+      <input
+        type="text"
+        name="contact_name"
+        value="{{ contact.contact_name }}"
+        maxlength="100"
+        required
+      />
+
+      <br /><br />
+
+      <label>Job Title:</label>
+      <input
+        type="text"
+        name="title"
+        value="{{ contact.title or '' }}"
+        maxlength="100"
+      />
+
+      <br /><br />
+
+      <label>Email:</label>
+      <input
+        type="email"
+        name="email"
+        value="{{ contact.email or '' }}"
+        maxlength="100"
+      />
+
+      <br /><br />
+
+      <label>Phone:</label>
+      <input
+        type="tel"
+        name="phone"
+        value="{{ contact.phone or '' }}"
+        maxlength="20"
+      />
+
+      <br /><br />
+
+      <label>LinkedIn URL:</label>
+      <input
+        type="url"
+        name="linkedin_url"
+        value="{{ contact.linkedin_url or '' }}"
+        maxlength="200"
+      />
+
+      <br /><br />
+
+      <label>Notes:</label>
+      <textarea name="notes">{{ contact.notes or '' }}</textarea>
+
+      <br /><br />
+
+      <button type="submit">Save Changes</button>
+
+      <a href="{{ url_for('contacts') }}">Cancel</a>
+    </form>
+  </body>
+</html>

@@ -319,5 +319,394 @@ def delete_job(job_id):
 
     return redirect(url_for('jobs'))
 
+# Display all applications
+@app.route('/applications')
+def applications():
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT
+            applications.*,
+            jobs.job_title,
+            companies.company_name
+        FROM applications
+        JOIN jobs
+            ON applications.job_id = jobs.job_id
+        JOIN companies
+            ON jobs.company_id = companies.company_id
+        ORDER BY applications.application_date DESC
+    """)
+
+    all_applications = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT
+            jobs.job_id,
+            jobs.job_title,
+            companies.company_name
+        FROM jobs
+        JOIN companies
+            ON jobs.company_id = companies.company_id
+        ORDER BY companies.company_name, jobs.job_title
+    """)
+
+    all_jobs = cursor.fetchall()
+
+    cursor.close()
+    connection.close()
+
+    return render_template(
+        'applications.html',
+        applications=all_applications,
+        jobs=all_jobs
+    )
+
+
+# Add a new application
+@app.route('/applications/add', methods=['POST'])
+def add_application():
+    job_id = request.form.get('job_id')
+    application_date = request.form.get('application_date')
+    status = request.form.get('status')
+    resume_version = request.form.get('resume_version', '').strip()
+
+    cover_letter_sent = 1 if request.form.get('cover_letter_sent') else 0
+
+    interview_date = request.form.get('interview_date', '').strip()
+    interview_notes = request.form.get('interview_notes', '').strip()
+
+    if not job_id or not application_date:
+        return "Job and application date are required.", 400
+
+    valid_statuses = [
+        'Applied', 'Screening', 'Interview',
+        'Offer', 'Rejected', 'Withdrawn'
+    ]
+
+    if status not in valid_statuses:
+        return "Invalid application status.", 400
+
+    # Store interview details as JSON
+    interview_data = json.dumps({
+        "interview_date": interview_date,
+        "notes": interview_notes
+    })
+
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        INSERT INTO applications
+        (job_id, application_date, status,
+         resume_version, cover_letter_sent, interview_data)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (
+        job_id,
+        application_date,
+        status,
+        resume_version,
+        cover_letter_sent,
+        interview_data
+    ))
+
+    connection.commit()
+    cursor.close()
+    connection.close()
+
+    return redirect(url_for('applications'))
+
+
+# Edit an existing application
+@app.route('/applications/edit/<int:application_id>', methods=['GET', 'POST'])
+def edit_application(application_id):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    if request.method == 'POST':
+        job_id = request.form.get('job_id')
+        application_date = request.form.get('application_date')
+        status = request.form.get('status')
+        resume_version = request.form.get('resume_version', '').strip()
+
+        cover_letter_sent = 1 if request.form.get('cover_letter_sent') else 0
+
+        interview_date = request.form.get('interview_date', '').strip()
+        interview_notes = request.form.get('interview_notes', '').strip()
+
+        if not job_id or not application_date:
+            cursor.close()
+            connection.close()
+            return "Job and application date are required.", 400
+
+        valid_statuses = [
+            'Applied', 'Screening', 'Interview',
+            'Offer', 'Rejected', 'Withdrawn'
+        ]
+
+        if status not in valid_statuses:
+            cursor.close()
+            connection.close()
+            return "Invalid application status.", 400
+
+        interview_data = json.dumps({
+            "interview_date": interview_date,
+            "notes": interview_notes
+        })
+
+        cursor.execute("""
+            UPDATE applications
+            SET job_id = %s,
+                application_date = %s,
+                status = %s,
+                resume_version = %s,
+                cover_letter_sent = %s,
+                interview_data = %s
+            WHERE application_id = %s
+        """, (
+            job_id,
+            application_date,
+            status,
+            resume_version,
+            cover_letter_sent,
+            interview_data,
+            application_id
+        ))
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+
+        return redirect(url_for('applications'))
+
+    cursor.execute("""
+        SELECT *
+        FROM applications
+        WHERE application_id = %s
+    """, (application_id,))
+
+    application = cursor.fetchone()
+
+    if application is None:
+        cursor.close()
+        connection.close()
+        return "Application not found.", 404
+
+    cursor.execute("""
+        SELECT
+            jobs.job_id,
+            jobs.job_title,
+            companies.company_name
+        FROM jobs
+        JOIN companies
+            ON jobs.company_id = companies.company_id
+        ORDER BY companies.company_name, jobs.job_title
+    """)
+
+    all_jobs = cursor.fetchall()
+
+    cursor.close()
+    connection.close()
+
+    # Convert JSON into Python dictionary
+    interview_data = application['interview_data']
+
+    if isinstance(interview_data, str):
+        interview_data = json.loads(interview_data)
+
+    application['interview_date'] = (
+        interview_data.get('interview_date', '')
+        if isinstance(interview_data, dict) else ''
+    )
+
+    application['interview_notes'] = (
+        interview_data.get('notes', '')
+        if isinstance(interview_data, dict) else ''
+    )
+
+    return render_template(
+        'edit_application.html',
+        application=application,
+        jobs=all_jobs
+    )
+
+
+# Delete an application
+@app.route('/applications/delete/<int:application_id>', methods=['POST'])
+def delete_application(application_id):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        DELETE FROM applications
+        WHERE application_id = %s
+    """, (application_id,))
+
+    connection.commit()
+    cursor.close()
+    connection.close()
+
+    return redirect(url_for('applications'))
+
+# Display all contacts
+@app.route('/contacts')
+def contacts():
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT
+            contacts.*,
+            companies.company_name
+        FROM contacts
+        LEFT JOIN companies
+            ON contacts.company_id = companies.company_id
+        ORDER BY contacts.contact_id DESC
+    """)
+
+    all_contacts = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT company_id, company_name
+        FROM companies
+        ORDER BY company_name
+    """)
+
+    all_companies = cursor.fetchall()
+
+    cursor.close()
+    connection.close()
+
+    return render_template(
+        'contacts.html',
+        contacts=all_contacts,
+        companies=all_companies
+    )
+
+
+# Add a new contact
+@app.route('/contacts/add', methods=['POST'])
+def add_contact():
+    company_id = request.form.get('company_id')
+    contact_name = request.form.get('contact_name', '').strip()
+    title = request.form.get('title', '').strip()
+    email = request.form.get('email', '').strip()
+    phone = request.form.get('phone', '').strip()
+    linkedin_url = request.form.get('linkedin_url', '').strip()
+    notes = request.form.get('notes', '').strip()
+
+    if not company_id or not contact_name:
+        return "Company and contact name are required.", 400
+
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        INSERT INTO contacts
+        (company_id, contact_name, title, email,
+         phone, linkedin_url, notes)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+    """, (
+        company_id, contact_name, title,
+        email, phone, linkedin_url, notes
+    ))
+
+    connection.commit()
+    cursor.close()
+    connection.close()
+
+    return redirect(url_for('contacts'))
+
+
+# Edit an existing contact
+@app.route('/contacts/edit/<int:contact_id>', methods=['GET', 'POST'])
+def edit_contact(contact_id):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    if request.method == 'POST':
+        company_id = request.form.get('company_id')
+        contact_name = request.form.get('contact_name', '').strip()
+        title = request.form.get('title', '').strip()
+        email = request.form.get('email', '').strip()
+        phone = request.form.get('phone', '').strip()
+        linkedin_url = request.form.get('linkedin_url', '').strip()
+        notes = request.form.get('notes', '').strip()
+
+        if not company_id or not contact_name:
+            cursor.close()
+            connection.close()
+            return "Company and contact name are required.", 400
+
+        cursor.execute("""
+            UPDATE contacts
+            SET company_id = %s,
+                contact_name = %s,
+                title = %s,
+                email = %s,
+                phone = %s,
+                linkedin_url = %s,
+                notes = %s
+            WHERE contact_id = %s
+        """, (
+            company_id, contact_name, title,
+            email, phone, linkedin_url, notes,
+            contact_id
+        ))
+
+        connection.commit()
+        cursor.close()
+        connection.close()
+
+        return redirect(url_for('contacts'))
+
+    cursor.execute("""
+        SELECT *
+        FROM contacts
+        WHERE contact_id = %s
+    """, (contact_id,))
+
+    contact = cursor.fetchone()
+
+    if contact is None:
+        cursor.close()
+        connection.close()
+        return "Contact not found.", 404
+
+    cursor.execute("""
+        SELECT company_id, company_name
+        FROM companies
+        ORDER BY company_name
+    """)
+
+    all_companies = cursor.fetchall()
+
+    cursor.close()
+    connection.close()
+
+    return render_template(
+        'edit_contact.html',
+        contact=contact,
+        companies=all_companies
+    )
+
+
+# Delete a contact
+@app.route('/contacts/delete/<int:contact_id>', methods=['POST'])
+def delete_contact(contact_id):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        DELETE FROM contacts
+        WHERE contact_id = %s
+    """, (contact_id,))
+
+    connection.commit()
+    cursor.close()
+    connection.close()
+
+    return redirect(url_for('contacts'))
+
 if __name__ == '__main__':
     app.run(debug=True)
