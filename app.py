@@ -1,8 +1,78 @@
 import json
+import re
 
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, g, render_template, request, redirect, url_for
+from mysql.connector import DatabaseError
 from database import get_db_connection
 app = Flask(__name__)
+
+
+@app.teardown_request
+def close_request_connections(error):
+    for connection in g.pop('db_connections', []):
+        connection.close()
+
+
+@app.errorhandler(DatabaseError)
+def invalid_database_input(error):
+    if error.errno == 1451:
+        return 'This record is still used by other records. Remove those first.', 409
+    if error.errno in {1048, 1264, 1265, 1292, 1366, 1406, 1452, 3819}:
+        return 'Invalid field value or related record. Please check your input.', 400
+    raise error
+
+
+@app.before_request
+def validate_record_form():
+    if request.method != 'POST':
+        return None
+    endpoint = request.endpoint or ''
+    tables = {
+        'company': ('companies', 'company_id'),
+        'job': ('jobs', 'job_id'),
+        'application': ('applications', 'application_id'),
+        'contact': ('contacts', 'contact_id'),
+    }
+    action, _, record_type = endpoint.partition('_')
+    if record_type not in tables or action not in {'add', 'edit', 'delete'}:
+        return None
+    if action in {'edit', 'delete'}:
+        table, primary_key = tables[record_type]
+        connection = get_db_connection()
+        cursor = connection.cursor()
+        cursor.execute(
+            f'SELECT {primary_key} FROM {table} WHERE {primary_key} = %s',
+            (request.view_args[primary_key],)
+        )
+        exists = cursor.fetchone()
+        cursor.close()
+        connection.close()
+        if not exists:
+            return 'Record not found.', 404
+    if action == 'delete':
+        return None
+    if record_type == 'job':
+        job_type = request.form.get('job_type', '')
+        if job_type and job_type not in {'Full-time', 'Part-time', 'Contract', 'Internship'}:
+            return 'Invalid job type.', 400
+        salaries = []
+        for field in ['salary_min', 'salary_max']:
+            value = request.form.get(field, '')
+            if value:
+                try:
+                    salary = int(value)
+                except ValueError:
+                    return 'Salary must be a non-negative whole number.', 400
+                if salary < 0 or salary > 2147483647:
+                    return 'Salary is outside the supported range.', 400
+                salaries.append(salary)
+        if len(salaries) == 2 and salaries[0] > salaries[1]:
+            return 'Minimum salary cannot exceed maximum salary.', 400
+    if record_type == 'contact':
+        email = request.form.get('email', '').strip()
+        if email and not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+', email):
+            return 'Invalid email address.', 400
+    return None
 
 
 # Dashboard
@@ -11,15 +81,60 @@ def dashboard():
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
 
+    # Total companies
     cursor.execute("SELECT COUNT(*) AS total FROM companies")
-    result = cursor.fetchone()
+    total_companies = cursor.fetchone()['total']
+
+    # Total jobs
+    cursor.execute("SELECT COUNT(*) AS total FROM jobs")
+    total_jobs = cursor.fetchone()['total']
+
+    # Total applications
+    cursor.execute("SELECT COUNT(*) AS total FROM applications")
+    total_applications = cursor.fetchone()['total']
+
+    # Total contacts
+    cursor.execute("SELECT COUNT(*) AS total FROM contacts")
+    total_contacts = cursor.fetchone()['total']
+
+    # Applications grouped by status
+    cursor.execute("""
+        SELECT status, COUNT(*) AS total
+        FROM applications
+        GROUP BY status
+    """)
+    application_statuses = cursor.fetchall()
+
+    # Five most recent applications
+    cursor.execute("""
+        SELECT
+            applications.application_id,
+            applications.application_date,
+            applications.status,
+            jobs.job_title,
+            companies.company_name
+        FROM applications
+        JOIN jobs
+            ON applications.job_id = jobs.job_id
+        JOIN companies
+            ON jobs.company_id = companies.company_id
+        ORDER BY applications.application_date DESC,
+                 applications.application_id DESC
+        LIMIT 5
+    """)
+    recent_applications = cursor.fetchall()
 
     cursor.close()
     connection.close()
 
     return render_template(
         'dashboard.html',
-        total_companies=result['total']
+        total_companies=total_companies,
+        total_jobs=total_jobs,
+        total_applications=total_applications,
+        total_contacts=total_contacts,
+        application_statuses=application_statuses,
+        recent_applications=recent_applications
     )
 
 
@@ -707,6 +822,139 @@ def delete_contact(contact_id):
     connection.close()
 
     return redirect(url_for('contacts'))
+
+# Calculate how well a user's skills match a job
+def calculate_job_match(user_skills, required_skills):
+
+    # Convert skills to lowercase and remove extra spaces
+    user_skills_set = {
+        skill.strip().lower()
+        for skill in user_skills
+        if isinstance(skill, str) and skill.strip()
+    }
+
+    required_skills_set = {
+        skill.strip().lower()
+        for skill in required_skills
+        if isinstance(skill, str) and skill.strip()
+    }
+
+    # Avoid division by zero
+    if not required_skills_set:
+        return {
+            'percentage': None,
+            'matched_skills': [],
+            'missing_skills': [],
+            'matched_count': 0,
+            'total_skills': 0
+        }
+
+    # Find matching and missing skills
+    matched_skills = user_skills_set.intersection(required_skills_set)
+
+    missing_skills = required_skills_set.difference(user_skills_set)
+
+    # Calculate percentage
+    percentage = round(
+        (len(matched_skills) / len(required_skills_set)) * 100
+    )
+
+    return {
+        'percentage': percentage,
+        'matched_skills': sorted(matched_skills),
+        'missing_skills': sorted(missing_skills),
+        'matched_count': len(matched_skills),
+        'total_skills': len(required_skills_set)
+    }
+
+
+# Job Match page
+@app.route('/job-match', methods=['GET', 'POST'])
+def job_match():
+
+    results = []
+    user_skills_text = ''
+
+    if request.method == 'POST':
+
+        user_skills_text = request.form.get(
+            'user_skills', ''
+        ).strip()
+
+        # Convert comma-separated skills into a list
+        user_skills = [
+            skill.strip()
+            for skill in user_skills_text.split(',')
+            if skill.strip()
+        ]
+
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+
+        # Get all jobs and their company names
+        cursor.execute("""
+            SELECT
+                jobs.job_id,
+                jobs.job_title,
+                jobs.requirements,
+                companies.company_name
+            FROM jobs
+            LEFT JOIN companies
+                ON jobs.company_id = companies.company_id
+        """)
+
+        all_jobs = cursor.fetchall()
+
+        cursor.close()
+        connection.close()
+
+        for job in all_jobs:
+
+            requirements = job['requirements']
+
+            # MySQL JSON may be returned as a string
+            if isinstance(requirements, str):
+                try:
+                    requirements = json.loads(requirements)
+                except json.JSONDecodeError:
+                    requirements = []
+
+            # Handle jobs without requirements
+            if not isinstance(requirements, list):
+                requirements = []
+
+            # Calculate the match
+            match = calculate_job_match(
+                user_skills,
+                requirements
+            )
+
+            results.append({
+                'job_id': job['job_id'],
+                'job_title': job['job_title'],
+                'company_name': job['company_name'],
+                'percentage': match['percentage'],
+                'matched_skills': match['matched_skills'],
+                'missing_skills': match['missing_skills'],
+                'matched_count': match['matched_count'],
+                'total_skills': match['total_skills']
+            })
+
+        # Sort highest percentage first.
+        # Jobs without requirements appear last.
+        results.sort(
+            key=lambda job: (
+                job['percentage'] is not None,
+                job['percentage'] if job['percentage'] is not None else -1
+            ),
+            reverse=True
+        )
+
+    return render_template(
+        'job_match.html',
+        results=results,
+        user_skills_text=user_skills_text
+    )
 
 if __name__ == '__main__':
     app.run(debug=True)

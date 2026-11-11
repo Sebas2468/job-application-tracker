@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% set page_title = "Job Match" %}
+{% set active_page = "job_match" %}
+{% set page_description = "Find opportunities that fit your skills." %}
+{% block content %}
+<section class="panel"><p>Enter your skills to find jobs that match your qualifications.</p>
+
+    <form class="form-grid" action="{{ url_for('job_match') }}" method="POST"><div class="field"><label for="user_skills">Your Skills:</label>
+
+      <input
+        type="text"
+        id="user_skills"
+        name="user_skills"
+        placeholder="Python, SQL, Flask"
+        value="{{ user_skills_text }}"
+        required
+      />
+
+      </div><div class="form-actions"><button type="submit">Find Matching Jobs</button></div></form>
+
+    <hr class="section-divider" />
+
+    {% if request.method == 'POST' %}
+
+    <h2>Matching Jobs</h2>
+
+    {% if results %}
+
+    <div class="table-scroll" role="region" aria-label="Job Match table" tabindex="0"><table>
+      <thead>
+        <tr>
+          <th>Rank</th>
+          <th>Company</th>
+          <th>Job Title</th>
+          <th>Match Percentage</th>
+          <th>Matching Skills</th>
+          <th>Missing Skills</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {% for job in results %}
+
+        <tr>
+          <td>{{ loop.index }}</td>
+
+          <td>{{ job.company_name or 'N/A' }}</td>
+
+          <td>{{ job.job_title }}</td>
+
+          <td>
+            {% if job.percentage is not none %}
+            <strong>{{ job.percentage }}%</strong>
+
+            <br />
+
+            ({{ job.matched_count }}/{{ job.total_skills }} skills) {% else %}
+            N/A - No requirements {% endif %}
+          </td>
+
+          <td>
+            {% if job.matched_skills %} {{ job.matched_skills | join(', ') }} {%
+            else %} None {% endif %}
+          </td>
+
+          <td>
+            {% if job.missing_skills %} {{ job.missing_skills | join(', ') }} {%
+            elif job.percentage is none %} Not specified {% else %} None {%
+            endif %}
+          </td>
+        </tr>
+
+        {% endfor %}
+      </tbody>
+    </table></div>
+
+    {% else %}
+
+    <p>No jobs found. Add some jobs first.</p>
+
+    {% endif %} {% endif %}</section>
+{% endblock %}

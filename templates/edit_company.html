@@ -1,76 +1,53 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Edit Company</title>
-  </head>
-
-  <body>
-    <h1>Edit Company</h1>
-
-    <form
+{% extends "base.html" %}
+{% set page_title = "Edit Company" %}
+{% set active_page = "companies" %}
+{% set page_description = "Update your saved company details." %}
+{% block content %}
+<section class="panel"><form class="form-grid"
       action="{{ url_for('edit_company', company_id=company.company_id) }}"
       method="POST"
-    >
-      <label>Company Name:</label>
-      <input
+    ><div class="field"><label for="company_name">Company Name:</label>
+      <input id="company_name"
         type="text"
         name="company_name"
         value="{{ company.company_name }}"
         maxlength="100"
         required
-      />
-
-      <br /><br />
-
-      <label>Industry:</label>
-      <input
+      /></div>
+<div class="field"><label for="industry">Industry:</label>
+      <input id="industry"
         type="text"
         name="industry"
         value="{{ company.industry or '' }}"
         maxlength="50"
-      />
-
-      <br /><br />
-
-      <label>Website:</label>
-      <input
+      /></div>
+<div class="field"><label for="website">Website:</label>
+      <input id="website"
         type="url"
         name="website"
         value="{{ company.website or '' }}"
         maxlength="200"
-      />
-
-      <br /><br />
-
-      <label>City:</label>
-      <input
+      /></div>
+<div class="field"><label for="city">City:</label>
+      <input id="city"
         type="text"
         name="city"
         value="{{ company.city or '' }}"
         maxlength="50"
-      />
-
-      <br /><br />
-
-      <label>State:</label>
-      <input
+      /></div>
+<div class="field"><label for="state">State:</label>
+      <input id="state"
         type="text"
         name="state"
         value="{{ company.state or '' }}"
         maxlength="50"
-      />
+      /></div>
+<div class="field field-wide"><label for="notes">Notes:</label>
+      <textarea id="notes" name="notes">{{ company.notes or '' }}</textarea></div>
 
-      <br /><br />
 
-      <label>Notes:</label>
-      <textarea name="notes">{{ company.notes or '' }}</textarea>
-
-      <br /><br />
-
-      <button type="submit">Save Changes</button>
+      <div class="form-actions"><button type="submit">Save Changes</button>
 
       <a href="{{ url_for('companies') }}">Cancel</a>
-    </form>
-  </body>
-</html>
+    </div></form></section>
+{% endblock %}

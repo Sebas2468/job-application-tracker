@@ -1,23 +1,55 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Job Application Tracker</title>
-  </head>
+{% extends "base.html" %}
+{% set page_title = "Dashboard" %}
+{% set active_page = "dashboard" %}
+{% set page_description = "A clear view of your job search, all in one place." %}
+{% block content %}
+<div class="stats-grid">
+{% for label, count in [('Companies', total_companies), ('Jobs', total_jobs), ('Applications', total_applications), ('Contacts', total_contacts)] %}
+<div class="stat-card"><span>{{ label }}</span><strong>{{ count }}</strong></div>
+{% endfor %}
+</div>
+<div class="dashboard-grid"><section class="panel"><h2>Applications by Status</h2>
 
-  <body>
-    <h1>Job Application Tracker</h1>
+    <div class="table-scroll" role="region" aria-label="Dashboard table" tabindex="0"><table>
+      <tr>
+        <th>Status</th>
+        <th>Total</th>
+      </tr>
 
-    <nav>
-      <a href="/">Dashboard</a> | <a href="/companies">Companies</a> |
-      <a href="/jobs">Jobs</a> | <a href="/applications">Applications</a> |
-      <a href="/contacts">Contacts</a>
-    </nav>
+      {% for item in application_statuses %}
+      <tr>
+        <td><span class="badge badge-{{ item.status|lower }}">{{ item.status }}</span></td>
+        <td>{{ item.total }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="2">No applications yet.</td>
+      </tr>
+      {% endfor %}
+    </table></div>
 
-    <hr />
+    </section><section class="panel"><h2>Recent Applications</h2>
 
-    <h2>Dashboard</h2>
+    <div class="table-scroll" role="region" aria-label="Dashboard table" tabindex="0"><table>
+      <tr>
+        <th>Company</th>
+        <th>Job Title</th>
+        <th>Application Date</th>
+        <th>Status</th>
+      </tr>
 
-    <p>Total Companies: {{ total_companies }}</p>
-  </body>
-</html>
+      {% for application in recent_applications %}
+      <tr>
+        <td>{{ application.company_name }}</td>
+        <td>{{ application.job_title }}</td>
+        <td>{{ application.application_date }}</td>
+        <td><span class="badge badge-{{ application.status|lower }}">{{ application.status }}</span></td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="4">No recent applications.</td>
+      </tr>
+      {% endfor %}
+    </table></div>
+  </section></div>
+{% endblock %}

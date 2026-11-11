@@ -1,28 +1,12 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Contacts - Job Application Tracker</title>
-  </head>
+{% extends "base.html" %}
+{% set page_title = "Contacts" %}
+{% set active_page = "contacts" %}
+{% set page_description = "Keep track of the people behind your opportunities." %}
+{% block content %}
+<section class="panel"><h2>Add New Contact</h2>
 
-  <body>
-    <h1>Job Application Tracker</h1>
-
-    <nav>
-      <a href="/">Dashboard</a> | <a href="/companies">Companies</a> |
-      <a href="/jobs">Jobs</a> | <a href="/applications">Applications</a> |
-      <a href="/contacts">Contacts</a>
-    </nav>
-
-    <hr />
-
-    <h2>Contacts</h2>
-
-    <h3>Add New Contact</h3>
-
-    <form action="{{ url_for('add_contact') }}" method="POST">
-      <label>Company:</label>
-      <select name="company_id" required>
+    <form class="form-grid" action="{{ url_for('add_contact') }}" method="POST"><div class="field"><label for="company_id">Company:</label>
+      <select id="company_id" name="company_id" required>
         <option value="">Select Company</option>
 
         {% for company in companies %}
@@ -30,48 +14,29 @@
           {{ company.company_name }}
         </option>
         {% endfor %}
-      </select>
+      </select></div>
+<div class="field"><label for="contact_name">Contact Name:</label>
+      <input id="contact_name" type="text" name="contact_name" maxlength="100" required /></div>
+<div class="field"><label for="title">Job Title:</label>
+      <input id="title" type="text" name="title" maxlength="100" placeholder="Recruiter" /></div>
+<div class="field"><label for="email">Email:</label>
+      <input id="email" type="email" name="email" maxlength="100" /></div>
+<div class="field"><label for="phone">Phone:</label>
+      <input id="phone" type="tel" name="phone" maxlength="20" /></div>
+<div class="field"><label for="linkedin_url">LinkedIn URL:</label>
+      <input id="linkedin_url" type="url" name="linkedin_url" maxlength="200" /></div>
+<div class="field field-wide"><label for="notes">Notes:</label>
+      <textarea id="notes" name="notes"></textarea></div>
 
-      <br /><br />
 
-      <label>Contact Name:</label>
-      <input type="text" name="contact_name" maxlength="100" required />
+      <div class="form-actions"><button type="submit">Add Contact</button>
+    </div></form>
 
-      <br /><br />
+    <hr class="section-divider" />
 
-      <label>Job Title:</label>
-      <input type="text" name="title" maxlength="100" placeholder="Recruiter" />
+    <h2>Saved Contacts</h2>
 
-      <br /><br />
-
-      <label>Email:</label>
-      <input type="email" name="email" maxlength="100" />
-
-      <br /><br />
-
-      <label>Phone:</label>
-      <input type="tel" name="phone" maxlength="20" />
-
-      <br /><br />
-
-      <label>LinkedIn URL:</label>
-      <input type="url" name="linkedin_url" maxlength="200" />
-
-      <br /><br />
-
-      <label>Notes:</label>
-      <textarea name="notes"></textarea>
-
-      <br /><br />
-
-      <button type="submit">Add Contact</button>
-    </form>
-
-    <hr />
-
-    <h3>Saved Contacts</h3>
-
-    <table border="1" cellpadding="10">
+    <div class="table-scroll" role="region" aria-label="Contacts table" tabindex="0"><table>
       <thead>
         <tr>
           <th>ID</th>
@@ -108,7 +73,7 @@
             {% else %} N/A {% endif %}
           </td>
 
-          <td>
+          <td><div class="row-actions">
             <a
               href="{{ url_for('edit_contact',
                         contact_id=contact.contact_id) }}"
@@ -120,12 +85,11 @@
               action="{{ url_for('delete_contact',
                             contact_id=contact.contact_id) }}"
               method="POST"
-              style="display: inline"
               onsubmit="return confirm('Delete this contact?');"
             >
               <button type="submit">Delete</button>
             </form>
-          </td>
+          </div></td>
         </tr>
 
         {% else %}
@@ -136,6 +100,5 @@
 
         {% endfor %}
       </tbody>
-    </table>
-  </body>
-</html>
+    </table></div></section>
+{% endblock %}

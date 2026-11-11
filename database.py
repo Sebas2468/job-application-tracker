@@ -1,6 +1,7 @@
 import mysql.connector
 import os
 from dotenv import load_dotenv
+from flask import g, has_request_context
 
 load_dotenv()
 
@@ -13,4 +14,6 @@ def get_db_connection():
         database=os.getenv("DB_NAME")
     )
 
+    if has_request_context():
+        g.setdefault('db_connections', []).append(connection)
     return connection

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ page_title }} · Job Application Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <aside class="sidebar">
+      <a class="brand" href="{{ url_for('dashboard') }}"><span class="brand-mark" aria-hidden="true">JT</span> Job Tracker</a>
+      <p class="sidebar-label">YOUR WORKSPACE</p>
+      <nav aria-label="Main navigation">
+        {% for endpoint, label in [('dashboard', 'Dashboard'), ('companies', 'Companies'), ('jobs', 'Jobs'), ('applications', 'Applications'), ('contacts', 'Contacts'), ('job_match', 'Job Match')] %}
+        <a href="{{ url_for(endpoint) }}" {% if active_page == endpoint %}class="active" aria-current="page"{% endif %}>{{ label }}</a>
+        {% endfor %}
+      </nav>
+      <p class="sidebar-note">Your next chapter starts here.<br />One application at a time.</p>
+    </aside>
+    <main id="main-content" tabindex="-1">
+      <header class="page-header">
+        <p class="eyebrow">JOB APPLICATION TRACKER</p>
+        <h1>{{ page_title }}</h1>
+        <p>{{ page_description }}</p>
+      </header>
+      {% block content %}{% endblock %}
+      <footer>Keep your opportunities organized. Keep moving forward.</footer>
+    </main>
+  </body>
+</html>
